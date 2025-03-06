@@ -40,6 +40,7 @@
             pkgsCross.mingwW64.buildPackages.pkg-config
             pkgsCross.mingwW64.buildPackages.ninja
             pkgsCross.mingwW64.buildPackages.lld
+            pkgsCross.mingwW64.buildPackages.llvm
             pkgsCross.mingwW64.buildPackages.bintools
           ];
 
