@@ -173,21 +173,21 @@ public:
 
 	struct CVValue_t
 	{
-		const char* m_pszString;
-		int64_t m_iStringLength;
-		float m_fValue;
-		int m_nValue;
-	};
+		const char* m_pszString; // 0x0000
+		int64_t m_iStringLength; // 0x0008
+		float m_fValue; // 0x0010
+		int m_nValue; // 0x0014
+	}; // Size: 0x0018
 
 	ConCommandBase m_ConCommandBase {}; // 0x0000
 	const char* m_pszDefaultValue {}; // 0x0040
 	CVValue_t m_Value {}; // 0x0048
-	bool m_bHasMin {}; // 0x005C
-	float m_fMinVal {}; // 0x0060
-	bool m_bHasMax {}; // 0x0064
-	float m_fMaxVal {}; // 0x0068
+	bool m_bHasMin {}; // 0x0060
+	float m_fMinVal {}; // 0x0064
+	bool m_bHasMax {}; // 0x0068
+	float m_fMaxVal {}; // 0x006C
 	void* m_pMalloc {}; // 0x0070
-	char m_pPad80[10] {}; // 0x0080
-}; // Size: 0x0080
+	char m_pPad80[10] {}; // 0x0078
+}; // Size: 0x0088
 
 int ParseConVarFlagsString(std::string modName, std::string flags);

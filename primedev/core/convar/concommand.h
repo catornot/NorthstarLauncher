@@ -111,8 +111,8 @@ public:
 	const char* m_pszName; // 0x0018
 	const char* m_pszHelpString; // 0x0020
 	int m_nFlags; // 0x0028
-	ConCommandBase* s_pConCommandBases; // 0x002C
-	IConCommandBaseAccessor* s_pAccessor; // 0x0034
+	ConCommandBase* s_pConCommandBases; // 0x0030
+	IConCommandBaseAccessor* s_pAccessor; // 0x0038
 }; // Size: 0x0040
 
 // taken from ttf2sdk
