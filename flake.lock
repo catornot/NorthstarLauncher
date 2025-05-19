@@ -18,13 +18,28 @@
         "type": "github"
       }
     },
+    "msvc-llvm": {
+      "locked": {
+        "lastModified": 1711618918,
+        "narHash": "sha256-nQLD+vZZFvIG6rSHr2XxGSmdTxNLeyvIEMs9jFw/YX4=",
+        "owner": "roblabla",
+        "repo": "msvc-llvm-nix",
+        "rev": "c98ac7ea24ccb7d1c053d5683c8a47151bfb1b03",
+        "type": "github"
+      },
+      "original": {
+        "owner": "roblabla",
+        "repo": "msvc-llvm-nix",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1737165118,
-        "narHash": "sha256-s40Kk/OulP3J/1JvC3VT16U4r/Xw6Qdi7SRw3LYkPWs=",
+        "lastModified": 1747485343,
+        "narHash": "sha256-YbsZyuRE1tobO9sv0PUwg81QryYo3L1F3R3rF9bcG38=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "6a3ae7a5a12fb8cac2d59d7df7cbd95f9b2f0566",
+        "rev": "9b5ac7ad45298d58640540d0323ca217f32a6762",
         "type": "github"
       },
       "original": {
@@ -37,6 +52,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "msvc-llvm": "msvc-llvm",
         "nixpkgs": "nixpkgs"
       }
     },

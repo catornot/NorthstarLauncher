@@ -28,7 +28,7 @@ stdenv.mkDerivation rec {
 
   # doesn't work :/
   configurePhase = ''
-      mkdir ${sourceRoot}/homeless-shelter
+    mkdir ${sourceRoot}/homeless-shelter
   '';
 
   buildPhase = ''
