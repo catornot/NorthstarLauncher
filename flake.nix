@@ -39,13 +39,13 @@
             libc = "msvcrt";
           };
         };
-        gcc = win-pkgs.buildPackages.wrapCC (
-          win-pkgs.buildPackages.gcc-unwrapped.override ({
+        win-gcc = win-pkgs.buildPackages.wrapCC (
+          win-pkgs.buildPackages.gcc-unwrapped.override {
             threadsCross = {
               model = "win32";
-              package = null;
+              package = win-pkgs.windows.crossThreadsStdenv;
             };
-          })
+          }
         );
       in
       let
@@ -58,27 +58,44 @@
         #   ];
         # });
 
+        buildInputsWindows = with win-pkgs; [
+          windows.mingw_w64_headers
+          windows.mcfgthreads
+          windows.mingw_w64_pthreads
+          windows.pthreads
+          windows.crossThreadsStdenv
+        ];
+
         nativeBuildInputsWindows = with win-pkgs; [
-          cmake
-          gcc
+          win-gcc
         ];
 
         nativeBuildInputsLinux = with pkgs; [
+          perl
           cmake
           # libclang
-          gnumake
+          # gnumake
           # msvc-toolchain
           ninja
           msbuild
           msitools
+          pkg-config
         ];
 
         build-ns = pkgs.writeShellApplication {
           name = "build-ns";
           runtimeInputs = nativeBuildInputsWindows ++ nativeBuildInputsLinux;
+
+          # -DCMAKE_CXX_COMPILER_WORKS=1 -DENABLE_THREADED_RESOLVER="OFF" -DCMAKE_C_COMPILER_WORKS=1
           text = ''
+
             cmake -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_LINKER=ldd-link -DCMAKE_CXX_FLAGS="-fuse-ld=lld-link" -G "Ninja" -B build
           '';
+          #        text = ''
+          #        	# for some reason libcurl can't find Threads
+          # cmake . -G "Ninja" -B build -DENABLE_THREADED_RESOLVER="OFF"
+          # cmake --build build/
+          #        '';
         };
 
       in
@@ -97,7 +114,10 @@
             ++ nativeBuildInputsWindows
             ++ nativeBuildInputsLinux;
 
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs + " ${pkgs.msvc-toolchain}/bin/x64";
+          buildInputs = buildInputsWindows;
+
+          # LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath nativeBuildInputs + " ${pkgs.msvc-toolchain}/bin/x64";
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputsWindows;
 
           shellHook = ''
             # export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
@@ -105,10 +125,14 @@
             # export PATH=${pkgs.msvc-toolchain}/kits/10/bin/10.0.18362.0/x86/rc.exe:$PATH
             # export PATH=${pkgs.msvc-toolchain}/bin/x64/clang-cl:$PATH
             # export BIN=${pkgs.msvc-toolchain}/bin/x64
+            # export PATH=${win-pkgs.windows.mingw_w64_pthreads}/lib:$PATH
             # . $BIN/msvcenv.sh
             # export CC=clang-cl
             # export CXX=clang-cl
             # export LD=lld-link
+            # export CC=gcc
+            # export CXX=g++
+            # export LD=ld
             echo 'Windows build environment loaded with MSVC toolchain'
           '';
         };
