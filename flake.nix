@@ -59,11 +59,11 @@
         # });
 
         buildInputsWindows = with win-pkgs; [
-          windows.mingw_w64_headers
-          windows.mcfgthreads
-          windows.mingw_w64_pthreads
-          windows.pthreads
-          windows.crossThreadsStdenv
+          # windows.mingw_w64_headers
+          # windows.mcfgthreads
+          # windows.mingw_w64_pthreads
+          # windows.pthreads
+          # windows.crossThreadsStdenv
         ];
 
         nativeBuildInputsWindows = with win-pkgs; [
@@ -71,15 +71,21 @@
         ];
 
         nativeBuildInputsLinux = with pkgs; [
-          perl
-          cmake
+          # perl
+          # cmake
           # libclang
           # gnumake
           # msvc-toolchain
-          ninja
-          msbuild
+          # ninja
+          # msbuild
+          # msitools
+          # pkg-config
+          wine
           msitools
-          pkg-config
+          cmake
+          ninja
+          samba
+          libunwind
         ];
 
         build-ns = pkgs.writeShellApplication {
@@ -120,19 +126,19 @@
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputsWindows;
 
           shellHook = ''
-            # export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
-            # export PATH=${pkgs.msvc-toolchain}/kits/10/bin/10.0.18362.0/x86:$PATH
-            # export PATH=${pkgs.msvc-toolchain}/kits/10/bin/10.0.18362.0/x86/rc.exe:$PATH
-            # export PATH=${pkgs.msvc-toolchain}/bin/x64/clang-cl:$PATH
-            # export BIN=${pkgs.msvc-toolchain}/bin/x64
+            export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
+            export PATH=${pkgs.msvc-toolchain}/kits/10/bin/10.0.18362.0/x86:$PATH
+            export PATH=${pkgs.msvc-toolchain}/kits/10/bin/10.0.18362.0/x86/rc.exe:$PATH
+            export PATH=${pkgs.msvc-toolchain}/bin/x64/clang-cl:$PATH
+            export BIN=${pkgs.msvc-toolchain}/bin/x64
             # export PATH=${win-pkgs.windows.mingw_w64_pthreads}/lib:$PATH
-            # . $BIN/msvcenv.sh
-            # export CC=clang-cl
-            # export CXX=clang-cl
-            # export LD=lld-link
-            # export CC=gcc
-            # export CXX=g++
-            # export LD=ld
+            . $BIN/msvcenv.sh
+            export CC=clang-cl
+            export CXX=clang-cl
+            export LD=lld-link
+            export CC=gcc
+            export CXX=g++
+            export LD=ld
             echo 'Windows build environment loaded with MSVC toolchain'
           '';
         };
