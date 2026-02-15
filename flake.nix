@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-win.url = "github:NixOS/nixpkgs/nixos-24.11";
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -15,6 +16,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-win,
       flake-utils,
       msvc-llvm,
     }:
@@ -24,27 +26,61 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ msvc-llvm.overlay ];
-          config.allowUnfree = true;
+          config = {
+            allowUnsupportedSystem = true;
+            allowUnfree = true;
+          };
+        };
+        win-pkgs = import nixpkgs-win {
+          inherit system;
+          crossSystem = {
+            config = "x86_64-w64-mingw32";
+            libc = "msvcrt";
+          };
+          config = {
+            allowUnsupportedSystem = true;
+            allowUnfree = true;
+          };
         };
 
         toolchainFile = pkgs.writeText "WindowsToolchain.cmake" ''
-        	set(CMAKE_SYSTEM_NAME Windows)
-			set(CMAKE_SYSTEM_VERSION 10.0)
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_SYSTEM_VERSION 10.0)
 
-			set(CMAKE_C_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-			set(CMAKE_CXX_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-			set(CMAKE_AR ${pkgs.msvc-toolchain}/bin/x64/lib.exe)
-			set(CMAKE_LINKER ${pkgs.msvc-toolchain}/bin/x64/lld-link)
-			set(CMAKE_RC_COMPILER /bin/true)
+          set(CMAKE_MAKE_PROGRAM ${pkgs.ninja}/bin/ninja)
 
-			set(CMAKE_C_FLAGS "/nologo")
-			set(CMAKE_CXX_FLAGS "/nologo")
-			set(CMAKE_EXE_LINKER_FLAGS "/DEBUG /INCREMENTAL")
+          set(CMAKE_C_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
+          set(CMAKE_CXX_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
+          set(CMAKE_AR ${pkgs.msvc-toolchain}/bin/x64/lib.exe)
+          set(CMAKE_LINKER ${pkgs.msvc-toolchain}/bin/x64/lld-link)
+          set(CMAKE_RC_COMPILER /bin/true)
 
-			set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
-			set(CMAKE_CXX_COMPILER_WORKS TRUE)
-			set(CMAKE_C_COMPILER_WORKS TRUE)
-	      '';
+          # Compiler/linker flags
+          set(CMAKE_C_FLAGS "/nologo")
+          set(CMAKE_CXX_FLAGS "/nologo")
+          set(CMAKE_EXE_LINKER_FLAGS "ws2_32.lib user32.lib kernel32.lib gdi32.lib")
+
+          # MASM workaround
+		  set(CMAKE_ASM_MASM_COMPILER ${pkgs.msvc-toolchain}/bin/x64/ml.exe)
+
+          # Disable automatic manifests (avoids llvm-rc /imsvc errors)
+          set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
+          set(CMAKE_CXX_COMPILER_WORKS TRUE)
+          set(CMAKE_C_COMPILER_WORKS TRUE)
+
+			# Force external Windows libcurl
+		  set(CURL_USE_STATIC_LIBS TRUE)
+		  set(CURL_DISABLE_TESTS ON)
+		  set(BUILD_CURL OFF)
+		  set(CURL_USE_LIBSSH2 OFF)
+		  set(CURL_USE_OPENSSL OFF)
+		  set(CURL_INCLUDE_DIR "${win-pkgs.curl.dev}/include")
+		  set(CURL_LIBRARY "${win-pkgs.curl.out}/lib/libcurl.lib")
+		  set(CURL_USE_STATIC_LIBS TRUE)
+	      find_package(CURL REQUIRED)
+
+		  set(CMAKE_CROSSCOMPILING_EMULATOR wine)
+		'';
       in
       {
         formatter = pkgs.nixfmt-tree;
@@ -57,7 +93,12 @@
             msitools
             samba
             msvc-toolchain
-
+            perl
+            wine
+			win-pkgs.zlib
+			win-pkgs.curl.dev
+			win-pkgs.curl
+			pkg-config
           ];
 
           buildInputs = [
@@ -68,8 +109,8 @@
 
 			  text = ''
 			  	set -e
-			    rm -rf build
-				mkdir -p build
+			 #    rm -rf build
+				# mkdir -p build
 
 			    # Load MSVC environment
 			    export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
@@ -86,7 +127,7 @@
               # Run CMake with cross-toolchain
               cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/WindowsToolchain.cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-			      cmake --build build/
+		      cmake --build build/
 			  '';
 			})
 
