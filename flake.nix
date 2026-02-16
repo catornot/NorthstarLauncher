@@ -5,6 +5,8 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     flake-utils.url = "github:numtide/flake-utils";
+
+    self.submodules = true; # flakes don't copy submodles by default so we need this
   };
 
   outputs =
@@ -29,7 +31,7 @@
         cross = pkgs.pkgsCross.x86_64-windows;
 
         base = cross.windows.sdk;
-        arch="x64";
+        arch = "x64";
 
         toolchainFile =
           let
@@ -43,8 +45,8 @@
               "-libpath:${MSVC_LIB}"
               "-libpath:${WINSDK_LIB}/ucrt/${arch}"
               "-libpath:${WINSDK_LIB}/um/${arch}"
-              "-libpath:${WINSDK_LIB}/x64"
-			  "-libpath:${MSVC_LIB}/x64"
+              "-libpath:${WINSDK_LIB}/${arch}"
+              "-libpath:${MSVC_LIB}/${arch}"
             ];
             compiler = mkArgs [
               "/vctoolsdir ${cross.windows.sdk}/crt"
@@ -70,7 +72,7 @@
             set(CMAKE_CXX_COMPILER "clang-cl")
             set(CMAKE_AR "llvm-lib")
             set(CMAKE_LINKER "lld-link")
-            # set(CMAKE_RC_COMPILER "llvm-rc")
+            set(CMAKE_RC_COMPILER "llvm-rc")
 
             set(CMAKE_C_FLAGS "${compiler}")
             set(CMAKE_CXX_FLAGS "${compiler}")
@@ -87,59 +89,104 @@
             message(STATUS "MSVC_LIB: ${MSVC_LIB}")
             message(STATUS "WINSDK_LIB: ${WINSDK_LIB}")
 
-			include_directories(${MSVC_INCLUDE})
-			include_directories(${WINSDK_INCLUDE}/ucrt)
-			include_directories(${WINSDK_INCLUDE}/shared)
-			include_directories(${WINSDK_INCLUDE}/um)
-			include_directories(${WINSDK_INCLUDE}/winrt)
+            include_directories(${MSVC_INCLUDE})
+            include_directories(${WINSDK_INCLUDE}/ucrt)
+            include_directories(${WINSDK_INCLUDE}/shared)
+            include_directories(${WINSDK_INCLUDE}/um)
+            include_directories(${WINSDK_INCLUDE}/winrt)
 
-			set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
             set(CMAKE_VERBOSE_MAKEFILE ON)
           '';
+
+        lib = pkgs.lib;
       in
       {
         formatter = pkgs.nixfmt-tree;
 
-         packages = rec {
-          northstar =
-            pkgs.stdenv.mkDerivation {
-              pname = "NorthstarLauncher";
-              version = "1.31.6";
-              src = ./.;
+        packages = {
+          northstar = pkgs.stdenv.mkDerivation {
+            pname = "NorthstarLauncher";
+            version = "0.0.0";
 
-              nativeBuildInputs = [
-	            cross.buildPackages.cmake
-	            cross.buildPackages.ninja
-	            cross.buildPackages.msitools
-	            pkgs.llvmPackages.clang-unwrapped
-	            pkgs.llvmPackages.bintools-unwrapped
-	            pkgs.perl
-	            pkgs.pkg-config
-	            cross.zlib
-	            cross.windows.sdk
-              ];
+            src = self;
 
-              buildInputs = [
-              ];
+            nativeBuildInputs = with pkgs; [
+              cross.buildPackages.cmake
+              cross.buildPackages.ninja
+              cross.buildPackages.msitools
+              llvmPackages.clang-unwrapped
+              llvmPackages.bintools-unwrapped
+              perl
+              pkg-config
+              git
+            ];
 
-              cmakeFlags = [
-              	"-G Ninja"
-                "-DCMAKE_BUILD_TYPE=Release"
-                "-DCMAKE_TOOLCHAIN_FILE=${toolchainFile}"
-                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-              ];
+            buildInputs = [
+              # cross.zlib
+              cross.windows.sdk
+            ];
 
-              meta = {
-                description = "Northstar launcher";
-                homepage = "https://northstar.tf/";
-                license = pkgs.lib.licenses.mit;
-                mainProgram = "NorthstarLauncher";
-                platforms = [ "x86_64-linux" ];
-                maintainers = [ ];
-              };
+            dontUseCmakeConfigure = true;
+            phases = [
+              "unpackPhase"
+              "patchPhase"
+              "postPatch"
+              "buildPhase"
+              "installPhase"
+            ];
+
+            postPatch =
+              let
+                zlib = pkgs.fetchFromGitHub {
+                  owner = "R2Northstar";
+                  repo = "zlib";
+                  rev = "9f0f2d4f9f1f28be7e16d8bf3b4e9d4ada70aa9f";
+                  hash = "sha256-PL6lH7I4qGduaVTR1pGfXUjpZp41kUERvGrqERmSoNQ=";
+                };
+              in
+              ''
+                mkdir -p $TMPDIR/cloned
+                zlib_src=$TMPDIR/cloned/zlib
+
+                cp -r ${zlib} "$zlib_src"
+
+                chmod +rw "$zlib_src"
+
+                substituteInPlace primedev/thirdparty/minizip/CMakeLists.txt \
+                  --replace "clone_repo(zlib https://github.com/madler/zlib)" "
+                  set(ZLIB_SOURCE_DIR $zlib_src)
+                  set(ZLIB_BINARY_DIR $zlib_src)
+                  	"
+              '';
+
+            buildPhase = ''
+              mkdir -p build
+
+              cmake -B build/ -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
+                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+              cmake --build build/
+            '';
+
+            installPhase = ''
+              mkdir -p $out
+              cp -r build/game $out
+            '';
+
+            meta = {
+              description = "Northstar launcher";
+              homepage = "https://northstar.tf/";
+              license = lib.licenses.mit;
+              mainProgram = "NorthstarLauncher";
+              platforms = [ "x86_64-linux" ];
+              maintainers = [ ];
             };
-          default = northstar;
+          };
+          default = self.packages.${system}.northstar;
         };
 
         devShell = pkgs.mkShellNoCC {
@@ -152,10 +199,7 @@
             perl
             cross.zlib
             pkg-config
-            cross.windows.sdk
-          ];
 
-          buildInputs = [
             (pkgs.writeShellApplication {
               name = "build-ns";
               runtimeInputs = [ ];
@@ -170,12 +214,19 @@
                 -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
                 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-
                 cmake --build build/
               '';
             })
           ];
 
+          buildInputs = [
+            cross.windows.sdk
+          ];
+
+          shellHook = "cp ${pkgs.writeText ".clangd" ''
+            CompileFlags:
+              CompilationDatabase: "cmake"
+          ''} .clangd";
         };
       }
     );
