@@ -7,6 +7,7 @@
 //===========================================================================//
 #pragma once
 
+#include <cstdint>
 #include "memaddr.h"
 #include <iostream>
 #include <string>

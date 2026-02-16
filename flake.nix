@@ -1,8 +1,9 @@
 {
-  description = "a collection of plugins for northstar related to bots";
+  description = "Northstar launcher";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/24.11";
+    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils = {
       url = "github:numtide/flake-utils";
     };
@@ -12,13 +13,14 @@
     {
       self,
       nixpkgs,
+      nixpkgs-unstable,
       flake-utils,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
         sys-pkgs = import nixpkgs { inherit system; };
-        pkgs = import nixpkgs {
+        nixpkgs-attrs = {
           inherit system;
           crossSystem = {
             config = "x86_64-w64-mingw32";
@@ -30,56 +32,67 @@
             microsoftVisualStudioLicenseAccepted = true;
           };
         };
+        pkgs = import nixpkgs nixpkgs-attrs;
+        pkgs-unstable = import nixpkgs-unstable nixpkgs-attrs;
 
-        cross = pkgs.pkgsCross.mingw-msvcrt-x86_64;
+        mkCross = pkgs: pkgs.pkgsCross.mingwW64;
+        cross = mkCross pkgs;
+        cross-unstable = mkCross pkgs-unstable;
+        sdk = (
+          # no overrides :(
+          cross-unstable.windows.sdk.override {
+            # lib = pkgs.lib;
+            # stdenvNoCC = pkgs.stdenvNoCC;
+            # testers = pkgs.testers;
+            # llvmPackages = pkgs.llvmPackages;
+            # callPackage = pkgs.callPackage;
+            # xwin = pkgs-unstable.xwin;
+          }
+        );
 
         toolchainFile = sys-pkgs.writeText "WindowsToolchain.cmake" ''
           set(CMAKE_SYSTEM_NAME Windows)
           set(CMAKE_SYSTEM_VERSION 10.0)
-
-          set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
-          # set(CMAKE_CXX_COMPILER_WORKS TRUE)
-          # set(CMAKE_C_COMPILER_WORKS TRUE)
-
-          set(CMAKE_CROSSCOMPILING_EMULATOR ${sys-pkgs.wine}/bin/wine)
+          include_directories("${cross.windows.mingw_w64_headers}/include")
+          set(DHAVE_IOCTLSOCKET ON)
+          set(DCMAKE_REQUIRED_LIBRARIES ws2_32)
         '';
       in
       {
-        formatter = sys-pkgs.nixfmt-tree;
+        formatter = sys-pkgs.nixfmt-rfc-style;
         packages = rec {
           northstar =
             with cross;
-            pkgs.windows.crossThreadsStdenv.mkDerivation {
+            cross.stdenv.mkDerivation {
               pname = "NorthstarLauncher";
               version = "0.0.0";
               src = builtins.path { path = self; };
 
-              nativeBuildInputs = with sys-pkgs; [
+              nativeBuildInputs = [
                 buildPackages.cmake
                 buildPackages.ninja
-                wine
-                msitools
-                perl
-                pkgs.windows.sdk
-                pkgs.windows.mingw_w64_headers
-                pkgs.gcc
+                buildPackages.pkg-config
+                buildPackages.perl
               ];
 
-              buildPhase = ''
-                mkdir -p build
+              buildInputs = [
+                cross.windows.mingw_w64_headers
+                cross.windows.mingw_w64_crt
+                cross.windows.pthreads
+                cross.windows.sdk
+                cross.zlib
+                cross.openssl
+              ];
 
-                cmake -B build -G Ninja \
-                  -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+              cmakeFlags = [
+                "-DCMAKE_BUILD_TYPE=Release"
+                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
-                cmake --build build
-              '';
-
-              installPhase = ''
-                mkdir -p $out
-                cp -r build/* $out/
-              '';
+                # libcurl stuff
+                "-DCURL_USE_WINDOWS_SOCKETS=ON"
+                "-DUSE_WINSOCK=ON"
+                "-DCMAKE_REQUIRED_LIBRARIES=ws2_32"
+              ];
 
               meta = {
                 description = "Northstar launcher";
@@ -93,27 +106,27 @@
           default = northstar;
         };
 
-        devShell = cross.mkShell rec {
-          nativeBuildInputs = [
-            cross.buildPackages.cmake
-            cross.buildPackages.pkg-config
-            cross.buildPackages.ninja
-            sys-pkgs.wine
-            sys-pkgs.perl
+        devShell = cross.mkShell {
+          nativeBuildInputs = with cross.buildPackages; [
+            cmake
+            ninja
+            pkg-config
+            perl
 
             (sys-pkgs.writeShellApplication {
               name = "build-ns";
               text = ''
-                # set -e
-                # rm -rf build
-                # mkdir -p build
+                set -e
+                rm -rf build
+                mkdir -p build
 
                 cmake -B build -G Ninja \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DCMAKE_SYSTEM_NAME=Windows \
-                  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-                  -DCMAKE_REQUIRED_LIBRARIES=ws2_32 \
-                  -DCURL_USE_SCHANNEL=ON
+                -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+                -DCURL_USE_WINDOWS_SOCKETS=ON \
+                -DUSE_WINSOCK=ON \
+                -DCMAKE_REQUIRED_LIBRARIES=ws2_32 \
 
                 cmake --build build
               '';
@@ -121,10 +134,12 @@
           ];
 
           buildInputs = [
-            pkgs.windows.mingw_w64_headers
-            pkgs.windows.pthreads
-            pkgs.windows.sdk
+            cross.windows.mingw_w64_headers
+            # cross.windows.mingw_w64_crt
+            cross.windows.pthreads
+            sdk
             cross.zlib
+            cross.openssl
           ];
         };
       }
