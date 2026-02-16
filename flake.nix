@@ -3,178 +3,167 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-24.url = "github:NixOS/nixpkgs/nixos-24.11";
 
     flake-utils.url = "github:numtide/flake-utils";
-
-    msvc-llvm = {
-      url = "github:roblabla/msvc-llvm-nix";
-    };
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      nixpkgs-24,
       flake-utils,
-      msvc-llvm,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ msvc-llvm.overlay ];
-          config = {
-            allowUnsupportedSystem = true;
-            allowUnfree = true;
-          };
-        };
-        win-pkgs = import nixpkgs {
-          inherit system;
-          crossSystem = {
-            config = "x86_64-w64-mingw32";
-            libc = "msvcrt";
-          };
+          overlays = [ ];
           config = {
             allowUnsupportedSystem = true;
             allowUnfree = true;
             microsoftVisualStudioLicenseAccepted = true;
           };
         };
-        curl-pkgs = import nixpkgs-24 {
-          inherit system;
-          crossSystem = {
-            config = "x86_64-w64-mingw32";
-            libc = "msvcrt";
-          };
-          config = {
-            allowUnsupportedSystem = true;
-            allowUnfree = true;
-            microsoftVisualStudioLicenseAccepted = true;
-          };
-        };
+        # win-pkgs = import nixpkgs {
+        #   inherit system;
+        #   crossSystem = {
+        #     config = "x86_64-windows";
+        #   };
+        #   config = {
+        #     allowUnsupportedSystem = true;
+        #     allowUnfree = true;
+        #     microsoftVisualStudioLicenseAccepted = true;
+        #   };
+        # };
 
-        toolchainFile = pkgs.writeText "WindowsToolchain.cmake" ''
-          set(CMAKE_SYSTEM_NAME Windows)
-          set(CMAKE_SYSTEM_VERSION 10.0)
+        cross = pkgs.pkgsCross.x86_64-windows;
 
-          set(CMAKE_MAKE_PROGRAM ${pkgs.ninja}/bin/ninja)
+        winsdkVersion = "10.0.26100";
+        base = cross.windows.sdk;
+        arch="x64";
 
-          set(CMAKE_C_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-          set(CMAKE_CXX_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-          set(CMAKE_AR ${pkgs.msvc-toolchain}/bin/x64/lib.exe)
-          set(CMAKE_LINKER ${pkgs.msvc-toolchain}/bin/x64/lld-link)
-          set(CMAKE_RC_COMPILER /bin/true)
+        toolchainFile =
+          let
+            MSVC_INCLUDE = "${base}/crt/include";
+            MSVC_LIB = "${base}/crt/lib";
+            WINSDK_INCLUDE = "${base}/sdk/Include";
+            WINSDK_LIB = "${base}/sdk/Lib";
+            mkArgs = args: builtins.concatStringsSep " " args;
+            linker = mkArgs [
+              "/manifest:no"
+              "-libpath:${MSVC_LIB}"
+              "-libpath:${WINSDK_LIB}/ucrt/${arch}"
+              "-libpath:${WINSDK_LIB}/um/${arch}"
+              "-libpath:${WINSDK_LIB}/x64"
+			  "-libpath:${MSVC_LIB}/x64"
+            ];
+            compiler = mkArgs [
+              "/vctoolsdir ${cross.windows.sdk}/crt"
+              "/winsdkdir ${cross.windows.sdk}/sdk"
+              "/EHs"
+              "-D_CRT_SECURE_NO_WARNINGS"
+              "--target=x86_64-windows-msvc"
+              "-fms-compatibility-version=19.11"
+              "-imsvc ${MSVC_INCLUDE}"
+              "-imsvc ${WINSDK_INCLUDE}/ucrt"
+              "-imsvc ${WINSDK_INCLUDE}/shared"
+              "-imsvc ${WINSDK_INCLUDE}/um"
+              "-imsvc ${WINSDK_INCLUDE}/winrt"
+              # "-I${MSVC_INCLUDE}"
+              # "-I${WINSDK_INCLUDE}/ucrt"
+              # "-I${WINSDK_INCLUDE}/shared"
+              # "-I${WINSDK_INCLUDE}/um"
+              # "-I${WINSDK_INCLUDE}/winrt"
+              # "-v"
+            ];
+          in
+          pkgs.writeText "WindowsToolchain.cmake" ''
+            set(CMAKE_SYSTEM_NAME Windows)
+            set(CMAKE_SYSTEM_VERSION 10.0)
+            set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
-          set(CMAKE_C_FLAGS "/nologo")
-          set(CMAKE_CXX_FLAGS "/nologo")
-          set(CMAKE_EXE_LINKER_FLAGS "ws2_32.lib user32.lib kernel32.lib gdi32.lib")
+            set(CMAKE_C_COMPILER "clang-cl")
+            set(CMAKE_CXX_COMPILER "clang-cl")
+            set(CMAKE_AR "llvm-lib")
+            set(CMAKE_LINKER "lld-link")
+            # set(CMAKE_RC_COMPILER "llvm-rc")
 
-          # MASM workaround
-          set(CMAKE_ASM_MASM_COMPILER ${pkgs.msvc-toolchain}/bin/x64/ml.exe)
+            set(CMAKE_C_FLAGS "${compiler}")
+            set(CMAKE_CXX_FLAGS "${compiler}")
+            set(CMAKE_EXE_LINKER_FLAGS "${linker}")
 
-          # Disable automatic manifests (avoids llvm-rc /imsvc errors)
-          set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
-          set(CMAKE_CXX_COMPILER_WORKS TRUE)
-          set(CMAKE_C_COMPILER_WORKS TRUE)
+            set(CMAKE_C_STANDARD_LIBRARIES "${compiler}")
+            set(CMAKE_CXX_STANDARD_LIBRARIES "${compiler}")
+            set(CMAKE_SHARED_LINKER_FLAGS "${linker}")
+            set(CMAKE_MODULE_LINKER_FLAGS "${linker}")
 
-          set(CMAKE_CROSSCOMPILING_EMULATOR ${pkgs.wine}/bin/wine)
-        '';
+            set(CMAKE_C_COMPILER_WORKS 1)
+            set(CMAKE_CXX_COMPILER_WORKS 1)
 
+            message(STATUS "MSVC_LIB: ${MSVC_LIB}")
+            message(STATUS "WINSDK_LIB: ${WINSDK_LIB}")
+
+			include_directories(${MSVC_INCLUDE})
+			include_directories(${WINSDK_INCLUDE}/ucrt)
+			include_directories(${WINSDK_INCLUDE}/shared)
+			include_directories(${WINSDK_INCLUDE}/um)
+			include_directories(${WINSDK_INCLUDE}/winrt)
+
+			set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+
+            set(CMAKE_VERBOSE_MAKEFILE ON)
+          '';
       in
       {
         formatter = pkgs.nixfmt-tree;
 
-        packages.default = with win-pkgs.pkgsCross.mingw32; win-pkgs.windows.crossThreadsStdenv.mkDerivation {
-          pname = "NorthstarLauncher";
-          version = "0.0.0";
-          src = builtins.path { path = ./.; };
-
+        devShell = pkgs.mkShellNoCC {
           nativeBuildInputs = with pkgs; [
-            buildPackages.cmake
-            buildPackages.ninja
-            wine
-            msvc-toolchain
-            msitools
+            cross.buildPackages.cmake
+            cross.buildPackages.ninja
+            cross.buildPackages.msitools
+            llvmPackages.clang-unwrapped
+            llvmPackages.bintools-unwrapped
             perl
-            win-pkgs.windows.sdk
-            win-pkgs.windows.mingw_w64_headers
-            win-pkgs.gcc
-          ];
-
-          buildPhase = ''
-            mkdir -p build
-
-            # export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
-            # . ${pkgs.msvc-toolchain}/bin/x64/msvcenv.sh
-
-            # export CC=${pkgs.msvc-toolchain}/bin/x64/clang-cl
-            # export CXX=${pkgs.msvc-toolchain}/bin/x64/clang-cl
-
-            cmake -B build -G Ninja \
-              # -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-
-            cmake --build build
-          '';
-
-          installPhase = ''
-            mkdir -p $out
-            cp -r build/* $out/
-          '';
-
-          meta = {
-            description = "Northstar launcher";
-            homepage = "https://northstar.tf/";
-            license = pkgs.lib.licenses.mit;
-            mainProgram = "NorthstarLauncher";
-            # platforms = [ "x86_64-w64-mingw32" "x86_64-linux" ]; # great!
-            maintainers = [ ];
-          };
-        };
-
-        devShell = pkgs.mkShell rec {
-          nativeBuildInputs = with pkgs; [
-            cmake
-            ninja
-            wine
-            msitools
-            samba
-            msvc-toolchain
-            perl
-            wine
-            curl-pkgs.curl.dev
-            curl-pkgs.curl
-            win-pkgs.zlib
-            # pkg-config
-            win-pkgs.windows.sdk
+            cross.zlib
+            pkg-config
+            cross.windows.sdk
           ];
 
           buildInputs = [
+            #           	(pkgs.writeScriptBin "build-ns" ''
+            # set -euo pipefail
 
+            # cat > hello.c <<- EOF
+            # #include <stdio.h>
+
+            # int main(int argc, char* argv[]) {
+            #   printf("Hello world!\n");
+            #   return 0;
+            # }
+            # EOF
+
+            # clang-cl --target=x86_64-pc-windows-msvc -fuse-ld=lld \
+            # /vctoolsdir ${cross.windows.sdk}/crt \
+            # /winsdkdir ${cross.windows.sdk}/sdk \
+            # ./hello.c -v
+            #          		''
+            # )
             (pkgs.writeShellApplication {
               name = "build-ns";
-              runtimeInputs = nativeBuildInputs;
+              runtimeInputs = [ ];
 
               text = ''
                 set -e
-                #    rm -rf build
-                # mkdir -p build
+                rm -rf build
+                mkdir -p build
 
-                # Load MSVC environment
-                export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
-                # shellcheck disable=SC1091
-                # . ${pkgs.msvc-toolchain}/bin/x64/msvcenv.sh
+                cmake -B build -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
+                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-                export INCLUDE="${pkgs.msvc-toolchain}/vc/tools/msvc/14.28.29333/include;${pkgs.msvc-toolchain}/kits/10/include/10.0.18362.0/shared;${pkgs.msvc-toolchain}/kits/10/include/10.0.18362.0/ucrt;${pkgs.msvc-toolchain}/kits/10/include/10.0.18362.0/um;${pkgs.msvc-toolchain}/kits/10/include/10.0.18362.0/winrt"
-                export LIB="${pkgs.msvc-toolchain}/vc/tools/msvc/14.28.29333/lib/x64;${pkgs.msvc-toolchain}/kits/10/lib/10.0.18362.0/um/x64"
-
-
-                # Run CMake with cross-toolchain
-                cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
                 cmake --build build/
               '';
@@ -182,27 +171,7 @@
 
           ];
 
-          #    shellHook = ''
-          #            export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
-          # . ${pkgs.msvc-toolchain}/bin/x64/msvcenv.sh
-          #    '';
-
         };
       }
     );
 }
-
-# Run CMake
-# cmake \
-#   -G Ninja \
-#   -DCMAKE_SYSTEM_NAME=Windows \
-#   -DCMAKE_C_COMPILER=$CC \
-#   -DCMAKE_CXX_COMPILER=$CXX \
-#   -DCMAKE_AR=$AR \
-#   -DCMAKE_LINKER=$LD \
-#   -DCMAKE_REQUIRED_LIBRARIES="Ws2_32.lib" \
-#   -DCMAKE_C_FLAGS="/Zi /Ob0 /Od /RTC1 /clang:-fuse-ld=lld" \
-#   -DCMAKE_CXX_FLAGS="/Zi /Ob0 /Od /RTC1 /clang:-fuse-ld=lld" \
-#   -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
-#   -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-#   -B build
