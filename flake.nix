@@ -25,21 +25,9 @@
             microsoftVisualStudioLicenseAccepted = true;
           };
         };
-        # win-pkgs = import nixpkgs {
-        #   inherit system;
-        #   crossSystem = {
-        #     config = "x86_64-windows";
-        #   };
-        #   config = {
-        #     allowUnsupportedSystem = true;
-        #     allowUnfree = true;
-        #     microsoftVisualStudioLicenseAccepted = true;
-        #   };
-        # };
 
         cross = pkgs.pkgsCross.x86_64-windows;
 
-        winsdkVersion = "10.0.26100";
         base = cross.windows.sdk;
         arch="x64";
 
@@ -70,18 +58,13 @@
               "-imsvc ${WINSDK_INCLUDE}/shared"
               "-imsvc ${WINSDK_INCLUDE}/um"
               "-imsvc ${WINSDK_INCLUDE}/winrt"
-              # "-I${MSVC_INCLUDE}"
-              # "-I${WINSDK_INCLUDE}/ucrt"
-              # "-I${WINSDK_INCLUDE}/shared"
-              # "-I${WINSDK_INCLUDE}/um"
-              # "-I${WINSDK_INCLUDE}/winrt"
-              # "-v"
             ];
           in
           pkgs.writeText "WindowsToolchain.cmake" ''
             set(CMAKE_SYSTEM_NAME Windows)
             set(CMAKE_SYSTEM_VERSION 10.0)
             set(CMAKE_SYSTEM_PROCESSOR x86_64)
+            set(IS_NIX_ENV 1) # for a check somewhere down the line
 
             set(CMAKE_C_COMPILER "clang-cl")
             set(CMAKE_CXX_COMPILER "clang-cl")
@@ -118,6 +101,47 @@
       {
         formatter = pkgs.nixfmt-tree;
 
+         packages = rec {
+          northstar =
+            pkgs.stdenv.mkDerivation {
+              pname = "NorthstarLauncher";
+              version = "1.31.6";
+              src = ./.;
+
+              nativeBuildInputs = [
+	            cross.buildPackages.cmake
+	            cross.buildPackages.ninja
+	            cross.buildPackages.msitools
+	            pkgs.llvmPackages.clang-unwrapped
+	            pkgs.llvmPackages.bintools-unwrapped
+	            pkgs.perl
+	            pkgs.pkg-config
+	            cross.zlib
+	            cross.windows.sdk
+              ];
+
+              buildInputs = [
+              ];
+
+              cmakeFlags = [
+              	"-G Ninja"
+                "-DCMAKE_BUILD_TYPE=Release"
+                "-DCMAKE_TOOLCHAIN_FILE=${toolchainFile}"
+                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+              ];
+
+              meta = {
+                description = "Northstar launcher";
+                homepage = "https://northstar.tf/";
+                license = pkgs.lib.licenses.mit;
+                mainProgram = "NorthstarLauncher";
+                platforms = [ "x86_64-linux" ];
+                maintainers = [ ];
+              };
+            };
+          default = northstar;
+        };
+
         devShell = pkgs.mkShellNoCC {
           nativeBuildInputs = with pkgs; [
             cross.buildPackages.cmake
@@ -132,24 +156,6 @@
           ];
 
           buildInputs = [
-            #           	(pkgs.writeScriptBin "build-ns" ''
-            # set -euo pipefail
-
-            # cat > hello.c <<- EOF
-            # #include <stdio.h>
-
-            # int main(int argc, char* argv[]) {
-            #   printf("Hello world!\n");
-            #   return 0;
-            # }
-            # EOF
-
-            # clang-cl --target=x86_64-pc-windows-msvc -fuse-ld=lld \
-            # /vctoolsdir ${cross.windows.sdk}/crt \
-            # /winsdkdir ${cross.windows.sdk}/sdk \
-            # ./hello.c -v
-            #          		''
-            # )
             (pkgs.writeShellApplication {
               name = "build-ns";
               runtimeInputs = [ ];
@@ -168,7 +174,6 @@
                 cmake --build build/
               '';
             })
-
           ];
 
         };
