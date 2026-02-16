@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-win.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs-24.url = "github:NixOS/nixpkgs/nixos-24.11";
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -16,7 +16,7 @@
     {
       self,
       nixpkgs,
-      nixpkgs-win,
+      nixpkgs-24,
       flake-utils,
       msvc-llvm,
     }:
@@ -31,7 +31,7 @@
             allowUnfree = true;
           };
         };
-        win-pkgs = import nixpkgs-win {
+        win-pkgs = import nixpkgs {
           inherit system;
           crossSystem = {
             config = "x86_64-w64-mingw32";
@@ -40,80 +40,57 @@
           config = {
             allowUnsupportedSystem = true;
             allowUnfree = true;
+            microsoftVisualStudioLicenseAccepted = true;
+          };
+        };
+        curl-pkgs = import nixpkgs-24 {
+          inherit system;
+          crossSystem = {
+            config = "x86_64-w64-mingw32";
+            libc = "msvcrt";
+          };
+          config = {
+            allowUnsupportedSystem = true;
+            allowUnfree = true;
+            microsoftVisualStudioLicenseAccepted = true;
           };
         };
 
         toolchainFile = pkgs.writeText "WindowsToolchain.cmake" ''
-                    set(CMAKE_SYSTEM_NAME Windows)
-                    set(CMAKE_SYSTEM_VERSION 10.0)
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_SYSTEM_VERSION 10.0)
 
-                    set(CMAKE_MAKE_PROGRAM ${pkgs.ninja}/bin/ninja)
+          set(CMAKE_MAKE_PROGRAM ${pkgs.ninja}/bin/ninja)
 
-                    set(CMAKE_C_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-                    set(CMAKE_CXX_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-                    set(CMAKE_AR ${pkgs.msvc-toolchain}/bin/x64/lib.exe)
-                    set(CMAKE_LINKER ${pkgs.msvc-toolchain}/bin/x64/lld-link)
-                    set(CMAKE_RC_COMPILER /bin/true)
+          set(CMAKE_C_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
+          set(CMAKE_CXX_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
+          set(CMAKE_AR ${pkgs.msvc-toolchain}/bin/x64/lib.exe)
+          set(CMAKE_LINKER ${pkgs.msvc-toolchain}/bin/x64/lld-link)
+          set(CMAKE_RC_COMPILER /bin/true)
 
-                    # Compiler/linker flags
-                    set(CMAKE_C_FLAGS "/nologo")
-                    set(CMAKE_CXX_FLAGS "/nologo")
-                    set(CMAKE_EXE_LINKER_FLAGS "ws2_32.lib user32.lib kernel32.lib gdi32.lib")
+          set(CMAKE_C_FLAGS "/nologo")
+          set(CMAKE_CXX_FLAGS "/nologo")
+          set(CMAKE_EXE_LINKER_FLAGS "ws2_32.lib user32.lib kernel32.lib gdi32.lib")
 
-                    # MASM workaround
-          		  set(CMAKE_ASM_MASM_COMPILER ${pkgs.msvc-toolchain}/bin/x64/ml.exe)
+          # MASM workaround
+          set(CMAKE_ASM_MASM_COMPILER ${pkgs.msvc-toolchain}/bin/x64/ml.exe)
 
-                    # Disable automatic manifests (avoids llvm-rc /imsvc errors)
-                    set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
-                    set(CMAKE_CXX_COMPILER_WORKS TRUE)
-                    set(CMAKE_C_COMPILER_WORKS TRUE)
+          # Disable automatic manifests (avoids llvm-rc /imsvc errors)
+          set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
+          set(CMAKE_CXX_COMPILER_WORKS TRUE)
+          set(CMAKE_C_COMPILER_WORKS TRUE)
 
-          			# Force external Windows libcurl
-          		  set(CURL_USE_STATIC_LIBS TRUE)
-          		  set(CURL_DISABLE_TESTS ON)
-          		  set(BUILD_CURL OFF)
-          		  set(CURL_USE_LIBSSH2 OFF)
-          		  set(CURL_USE_OPENSSL OFF)
-          		  set(CURL_INCLUDE_DIR "${win-pkgs.curl.dev}/include")
-          		  set(CURL_LIBRARY "${win-pkgs.curl.out}/lib/libcurl.lib")
-          		  set(CURL_USE_STATIC_LIBS TRUE)
-          	      find_package(CURL REQUIRED)
-
-          		  set(CMAKE_CROSSCOMPILING_EMULATOR wine)
-          		'';
-
-        toolchainFileBuild = pkgs.writeText "WindowsToolchain.cmake" ''
-                  set(CMAKE_SYSTEM_NAME Windows)
-                  set(CMAKE_SYSTEM_VERSION 10.0)
-                  set(CMAKE_MAKE_PROGRAM ${pkgs.ninja}/bin/ninja)
-
-                  set(CMAKE_C_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-                  set(CMAKE_CXX_COMPILER ${pkgs.msvc-toolchain}/bin/x64/clang-cl)
-                  set(CMAKE_AR lib.exe)
-                  set(CMAKE_LINKER ${pkgs.msvc-toolchain}/bin/x64/lld-link)
-                  set(CMAKE_RC_COMPILER /bin/true)
-                  set(CMAKE_ASM_MASM_COMPILER ${pkgs.msvc-toolchain}/bin/x64/ml.exe)
-
-                  set(CMAKE_C_FLAGS "/nologo")
-                  set(CMAKE_CXX_FLAGS "/nologo")
-                  set(CMAKE_EXE_LINKER_FLAGS "ws2_32.lib user32.lib kernel32.lib gdi32.lib")
-                  set(CMAKE_GENERATE_WINDOWS_MANIFESTS OFF)
-
-                  set(CMAKE_CROSSCOMPILING_EMULATOR ${pkgs.wine}/bin/wine)
-
-                  if(NOT EXISTS "$\{CMAKE_CURRENT_SOURCE_DIR}/primedev/thirdparty/minhook")
-          		  message(FATAL_ERROR "Failed to find third party dependency in $\{CMAKE_CURRENT_SOURCE_DIR}/primedev/thirdparty/minhook")
-          		endif()
+          set(CMAKE_CROSSCOMPILING_EMULATOR ${pkgs.wine}/bin/wine)
         '';
 
       in
       {
         formatter = pkgs.nixfmt-tree;
 
-        packages.default = win-pkgs.stdenvNoCC.mkDerivation {
+        packages.default = win-pkgs.stdenv.mkDerivation {
           pname = "NorthstarLauncher";
           version = "0.0.0";
-          src = ./.;
+          src = builtins.path { path = ./.; };
 
           nativeBuildInputs = with pkgs; [
             cmake
@@ -122,31 +99,22 @@
             msvc-toolchain
             msitools
             perl
-          ];
-
-            dontUseCMakeFlags = true;
-
-          cmakeFlags = [
-            "-DCMAKE_TOOLCHAIN_FILE=${toolchainFileBuild}"
-            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-            "-DCMAKE_BUILD_TYPE=Release"
-            "-DCMAKE_C_COMPILER=${pkgs.msvc-toolchain}/bin/x64/clang-cl"
-            "-DCMAKE_CXX_COMPILER=${pkgs.msvc-toolchain}/bin/x64/clang-cl"
+            win-pkgs.windows.sdk
           ];
 
           buildPhase = ''
             mkdir -p build
 
-            export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
-            . ${pkgs.msvc-toolchain}/bin/x64/msvcenv.sh
+            # export PATH=${pkgs.msvc-toolchain}/bin/x64:$PATH
+            # . ${pkgs.msvc-toolchain}/bin/x64/msvcenv.sh
 
-		    export CC=${pkgs.msvc-toolchain}/bin/x64/clang-cl
-		    export CXX=${pkgs.msvc-toolchain}/bin/x64/clang-cl
+            # export CC=${pkgs.msvc-toolchain}/bin/x64/clang-cl
+            # export CXX=${pkgs.msvc-toolchain}/bin/x64/clang-cl
 
-		    cmake -B build -G Ninja \
-		      -DCMAKE_TOOLCHAIN_FILE=${toolchainFileBuild} \
-		      -DCMAKE_BUILD_TYPE=Release \
-		      -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+            cmake -B build -G Ninja \
+              # -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
             cmake --build build
           '';
@@ -155,6 +123,15 @@
             mkdir -p $out
             cp -r build/* $out/
           '';
+
+          meta = {
+            description = "Northstar launcher";
+            homepage = "https://northstar.tf/";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "NorthstarLauncher";
+            # platforms = [ "x86_64-w64-mingw32" "x86_64-linux" ]; # great!
+            maintainers = [ ];
+          };
         };
 
         devShell = pkgs.mkShell rec {
@@ -167,10 +144,11 @@
             msvc-toolchain
             perl
             wine
+            curl-pkgs.curl.dev
+            curl-pkgs.curl
             win-pkgs.zlib
-            win-pkgs.curl.dev
-            win-pkgs.curl
-            pkg-config
+            # pkg-config
+            win-pkgs.windows.sdk
           ];
 
           buildInputs = [
