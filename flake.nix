@@ -87,19 +87,21 @@
       {
         formatter = pkgs.nixfmt-tree;
 
-        packages.default = win-pkgs.stdenv.mkDerivation {
+        packages.default = with win-pkgs.pkgsCross.mingw32; win-pkgs.windows.crossThreadsStdenv.mkDerivation {
           pname = "NorthstarLauncher";
           version = "0.0.0";
           src = builtins.path { path = ./.; };
 
           nativeBuildInputs = with pkgs; [
-            cmake
-            ninja
+            buildPackages.cmake
+            buildPackages.ninja
             wine
             msvc-toolchain
             msitools
             perl
             win-pkgs.windows.sdk
+            win-pkgs.windows.mingw_w64_headers
+            win-pkgs.gcc
           ];
 
           buildPhase = ''
