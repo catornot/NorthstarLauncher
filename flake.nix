@@ -2,7 +2,7 @@
   description = "Northstar launcher";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/24.11";
+    nixpkgs.url = "github:nixos/nixpkgs/25.11";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils = {
       url = "github:numtide/flake-utils";
@@ -19,54 +19,44 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        sys-pkgs = import nixpkgs { inherit system; };
-        nixpkgs-attrs = {
+        pkgs = import nixpkgs {
           inherit system;
-          crossSystem = {
-            config = "x86_64-w64-mingw32";
-            libc = "msvcrt";
-          };
+          config.allowUnsupportedSystem = true;
+        };
+        pkgs-unstable = import nixpkgs-unstable {
+          inherit system;
           config = {
-            allowUnsupportedSystem = true;
             allowUnfree = true;
             microsoftVisualStudioLicenseAccepted = true;
+            allowUnsupportedSystem = true;
           };
         };
-        pkgs = import nixpkgs nixpkgs-attrs;
-        pkgs-unstable = import nixpkgs-unstable nixpkgs-attrs;
 
-        mkCross = pkgs: pkgs.pkgsCross.mingwW64;
-        cross = mkCross pkgs;
+        mkCross = pkgs: pkgs.pkgsCross.mingw-msvcrt-x86_64;
+        cross = mkCross pkgs-unstable;
         cross-unstable = mkCross pkgs-unstable;
-        sdk = (
-          # no overrides :(
-          cross-unstable.windows.sdk.override {
-            # lib = pkgs.lib;
-            # stdenvNoCC = pkgs.stdenvNoCC;
-            # testers = pkgs.testers;
-            # llvmPackages = pkgs.llvmPackages;
-            # callPackage = pkgs.callPackage;
-            # xwin = pkgs-unstable.xwin;
-          }
-        );
 
-        toolchainFile = sys-pkgs.writeText "WindowsToolchain.cmake" ''
+        toolchainFile = pkgs.writeText "WindowsToolchain.cmake" ''
           set(CMAKE_SYSTEM_NAME Windows)
           set(CMAKE_SYSTEM_VERSION 10.0)
-          include_directories("${cross.windows.mingw_w64_headers}/include")
-          set(DHAVE_IOCTLSOCKET ON)
-          set(DCMAKE_REQUIRED_LIBRARIES ws2_32)
         '';
       in
       {
-        formatter = sys-pkgs.nixfmt-rfc-style;
+        formatter = pkgs.nixfmt-rfc-style;
         packages = rec {
           northstar =
             with cross;
-            cross.stdenv.mkDerivation {
+            cross.stdenv.mkDerivation rec {
               pname = "NorthstarLauncher";
-              version = "0.0.0";
-              src = builtins.path { path = self; };
+              version = "1.31.6";
+              # src = fetchFromGitHub {
+              #   owner = "R2Northstar";
+              #   repo = "NorthstarLauncher";
+              #   rev = "v${version}";
+              #   hash = "sha256-RQfMu5Gcsqemy35ZCCo6ABRy4ci4D5PaVzC1M+UMkNQ=";
+              #   fetchSubmodules = true;
+              # };
+              src = ./.;
 
               nativeBuildInputs = [
                 buildPackages.cmake
@@ -77,14 +67,15 @@
 
               buildInputs = [
                 cross.windows.mingw_w64_headers
-                cross.windows.mingw_w64_crt
                 cross.windows.pthreads
-                cross.windows.sdk
                 cross.zlib
                 cross.openssl
               ];
 
               cmakeFlags = [
+                "-DCMAKE_SYSTEM_NAME=Windows"
+                "-DCMAKE_SYSTEM_VERSION=10.0"
+
                 "-DCMAKE_BUILD_TYPE=Release"
                 "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
@@ -97,7 +88,7 @@
               meta = {
                 description = "Northstar launcher";
                 homepage = "https://northstar.tf/";
-                license = sys-pkgs.lib.licenses.mit;
+                license = pkgs.lib.licenses.mit;
                 mainProgram = "NorthstarLauncher";
                 # platforms = [ "x86_64-w64-mingw32" "x86_64-linux" ]; # great!
                 maintainers = [ ];
@@ -113,7 +104,7 @@
             pkg-config
             perl
 
-            (sys-pkgs.writeShellApplication {
+            (pkgs.writeShellApplication {
               name = "build-ns";
               text = ''
                 set -e
@@ -124,9 +115,6 @@
                 -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-                -DCURL_USE_WINDOWS_SOCKETS=ON \
-                -DUSE_WINSOCK=ON \
-                -DCMAKE_REQUIRED_LIBRARIES=ws2_32 \
 
                 cmake --build build
               '';
@@ -134,10 +122,8 @@
           ];
 
           buildInputs = [
+            cross.windows.mcfgthreads
             cross.windows.mingw_w64_headers
-            # cross.windows.mingw_w64_crt
-            cross.windows.pthreads
-            sdk
             cross.zlib
             cross.openssl
           ];
