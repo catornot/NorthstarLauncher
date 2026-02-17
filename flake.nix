@@ -95,10 +95,15 @@
             include_directories(${WINSDK_INCLUDE}/um)
             include_directories(${WINSDK_INCLUDE}/winrt)
 
+
             set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
             set(CMAKE_VERBOSE_MAKEFILE ON)
           '';
+
+        mkBuildDir = /* bash */ ''
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        '';
 
         lib = pkgs.lib;
       in
@@ -124,7 +129,7 @@
             ];
 
             buildInputs = [
-              # cross.zlib
+              # cross.zlib # TODO: need upstream fixes for this # but also northstar is vendoring zlib so let it vendor it self
               cross.windows.sdk
             ];
 
@@ -164,10 +169,7 @@
             buildPhase = ''
               mkdir -p build
 
-              cmake -B build/ -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
-                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+              ${mkBuildDir}
 
               cmake --build build/
             '';
@@ -189,45 +191,47 @@
           default = self.packages.${system}.northstar;
         };
 
-        devShell = pkgs.mkShellNoCC {
-          nativeBuildInputs = with pkgs; [
-            cross.buildPackages.cmake
-            cross.buildPackages.ninja
-            cross.buildPackages.msitools
-            llvmPackages.clang-unwrapped
-            llvmPackages.bintools-unwrapped
-            perl
-            cross.zlib
-            pkg-config
+        devShells = {
+          no-auto-build = pkgs.mkShellNoCC {
+            nativeBuildInputs = with pkgs; [
+              cross.buildPackages.cmake
+              cross.buildPackages.ninja
+              cross.buildPackages.msitools
+              llvmPackages.clang-unwrapped
+              llvmPackages.bintools-unwrapped
+              perl
+              cross.zlib
+              pkg-config
 
-            (pkgs.writeShellApplication {
-              name = "build-ns";
-              runtimeInputs = [ ];
-
-              text = ''
-                set -e
-                rm -rf build
+              (pkgs.writeShellScriptBin "rebuild-ns" ''
+                rm -rf build/
                 mkdir -p build
 
-                cmake -B build -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} \
-                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-
+                ${mkBuildDir}
                 cmake --build build/
-              '';
-            })
-          ];
+              '')
+              (pkgs.writeShellScriptBin "init-ns" mkBuildDir)
+              (pkgs.writeShellScriptBin "build-ns" "cmake --build build/")
+            ];
 
-          buildInputs = [
-            cross.windows.sdk
-          ];
+            buildInputs = [
+              cross.windows.sdk
+            ];
 
-          shellHook = "cp ${pkgs.writeText ".clangd" ''
-            CompileFlags:
-              CompilationDatabase: "cmake"
-          ''} .clangd";
+            shellHook = ''
+              cp -f ${pkgs.writeText ".clangd" ''
+                CompileFlags:
+                  CompilationDatabase: "cmake"
+              ''} .clangd
+              echo "Northstar shell init"
+              echo "    init-ns: setups the build dir for cmake and stuff"
+              echo "    build-ns: incrementally re/builds northstar"
+              echo "    rebuild-ns: builds northstar"
+            '';
+          };
+          default = self.devShells.${system}.no-auto-build;
         };
+
       }
     );
 }
