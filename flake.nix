@@ -17,7 +17,6 @@
       nixpkgs,
       flake-utils,
       treefmt-nix,
-      systems,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -108,6 +107,9 @@
         mkBuildDir = /* bash */ ''
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${toolchainFile} -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         '';
+    	mkBuildDirShell = /*bash*/ ''
+    		${pkgs.bear} -- ${mkBuildDir} -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+    	'';
 
         lib = pkgs.lib;
 
@@ -117,7 +119,6 @@
           treefmt-nix.lib.evalModule pkgs (
             { ... }:
             {
-
               # Used to find the project root
               projectRootFile = "flake.nix";
 
@@ -133,7 +134,6 @@
               ];
             }
           );
-
       in
       {
         # for `nix fmt`
@@ -240,10 +240,10 @@
                 rm -rf build/
                 mkdir -p build
 
-                ${mkBuildDir}
+                ${mkBuildDirShell}
                 cmake --build build/
               '')
-              (pkgs.writeShellScriptBin "init-ns" mkBuildDir)
+              (pkgs.writeShellScriptBin "init-ns" mkBuildDirShell)
               (pkgs.writeShellScriptBin "build-ns" "cmake --build build/")
             ];
 
@@ -264,7 +264,6 @@
           };
           default = self.devShells.${system}.no-auto-build;
         };
-
       }
     );
 }
