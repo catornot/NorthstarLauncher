@@ -376,4 +376,4 @@ MigrationBackup/
 
 # Nix outputs
 .clangd
-result/
+result

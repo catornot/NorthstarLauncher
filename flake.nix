@@ -6,6 +6,8 @@
 
     flake-utils.url = "github:numtide/flake-utils";
 
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+
     self.submodules = true; # flakes don't copy submodles by default so we need this
   };
 
@@ -14,6 +16,8 @@
       self,
       nixpkgs,
       flake-utils,
+      treefmt-nix,
+      systems,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -106,9 +110,38 @@
         '';
 
         lib = pkgs.lib;
+
+        # Eval the treefmt modules from ./treefmt.nix
+        treefmtEval =
+          pkgs:
+          treefmt-nix.lib.evalModule pkgs (
+            { ... }:
+            {
+
+              # Used to find the project root
+              projectRootFile = "flake.nix";
+
+              # Add formaters for some other langs
+              # programs.clang-format.enable = true; # doesn't format correctly yet
+              programs.nixfmt.enable = true;
+
+              # settings
+              settings.formater.clang-format.args = [
+                "-i"
+                "--style=file"
+                "--exclude=primedev/include primedev/*.cpp primedev/*.h"
+              ];
+            }
+          );
+
       in
       {
-        formatter = pkgs.nixfmt-tree;
+        # for `nix fmt`
+        formatter = (treefmtEval pkgs).config.build.wrapper;
+        # for `nix flake check`
+        checks = {
+          formatting = (treefmtEval pkgs).config.build.check self;
+        };
 
         packages = {
           northstar = pkgs.stdenv.mkDerivation {
