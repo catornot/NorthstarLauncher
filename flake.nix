@@ -135,14 +135,22 @@
 
               # settings
               settings.formatter.clang-format = {
+                command = "${pkgs.llvmPackages_18.clang-tools}/bin/clang-format";
+                includes = [
+                  "*.c"
+                  "*.cpp"
+                  "*.h"
+                  "*.hpp"
+                  "*.cc"
+                ];
                 args = [
                   "-i"
-                  "--style=file"
+                  "-style=file:${./.clang-format}"
                 ];
                 excludes = [
                   "primedev/include/**"
-                  "primedev/*.cpp"
-                  "primedev/*.h"
+                  "primedev/thirdparty/**"
+                  "primedev/wsockproxy/**"
                 ];
               };
             }

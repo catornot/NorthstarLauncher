@@ -54,7 +54,7 @@ jobs:
         source: 'primedev'
         exclude: 'primedev/include primedev/thirdparty primedev/wsockproxy'
         extensions: 'h,cpp'
-        clangFormatVersion: 16
+        clangFormatVersion: 18
         style: file
 
   nix-build:
