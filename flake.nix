@@ -138,7 +138,7 @@
 
               # settings
               settings.formatter.clang-format = {
-              	package = nixpkgs-24-11.legacyPackages.${system}.llvmPackages_16.clang-tools;
+                package = nixpkgs-24-11.legacyPackages.${system}.llvmPackages_16.clang-tools;
                 args = [
                   "-i"
                   "--style=file"
