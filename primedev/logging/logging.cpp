@@ -122,10 +122,13 @@ void CustomSink::custom_log(const custom_log_msg& msg)
 
 void InitialiseConsole()
 {
-	if (strstr(GetCommandLineA(), "-noallocconsole")) {
+	if (strstr(GetCommandLineA(), "-noallocconsole"))
+	{
 		FreeConsole();
 		return;
-	} else if (AllocConsole() != FALSE)	{
+	}
+	else if (AllocConsole() != FALSE)
+	{
 		freopen("CONOUT$", "w", stdout);
 		freopen("CONOUT$", "w", stderr);
 	}
