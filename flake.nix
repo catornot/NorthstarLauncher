@@ -139,14 +139,19 @@
               # settings
               settings.formatter.clang-format = {
                 package = nixpkgs-24-11.legacyPackages.${system}.llvmPackages_16.clang-tools;
-                args = [
+                command = "${nixpkgs-24-11.legacyPackages.${system}.llvmPackages_16.clang-tools}/bin/clang-format";
+                options = [
                   "-i"
                   "--style=file"
                 ];
                 excludes = [
                   "primedev/include/**"
-                  "primedev/*.cpp"
-                  "primedev/*.h"
+                  "primedev/thirdparty/**"
+                  "primedev/wsockproxy/**"
+                  "primedev/dllmain.cpp"
+                  "primedev/ns_version.h"
+                  "primedev/pch.h"
+                  "primedev/resource1.h"
                 ];
               };
             }
