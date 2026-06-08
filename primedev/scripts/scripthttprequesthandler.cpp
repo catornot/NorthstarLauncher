@@ -236,7 +236,7 @@ template <ScriptContext context> int HttpRequestHandler::MakeHttpRequest(const H
 		[this, handle, requestParameters, bAllowLocalHttp]()
 		{
 			ZoneScoped;
-			ZoneColor( tracy::Color::Red3 );
+			ZoneColor(tracy::Color::Red3);
 
 			std::string hostname, resolvedAddress, resolvedPort;
 

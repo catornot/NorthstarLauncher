@@ -72,7 +72,7 @@ uintmax_t GetSizeOfFolder(fs::path dir)
 template <ScriptContext context> void SaveFileManager::SaveFileAsync(fs::path file, std::string contents)
 {
 	ZoneScoped;
-	ZoneColor( tracy::Color::Red3 );
+	ZoneColor(tracy::Color::Red3);
 
 	auto mutex = std::ref(fileMutex);
 	std::thread writeThread(
@@ -145,7 +145,7 @@ template <ScriptContext context> void SaveFileManager::SaveFileAsync(fs::path fi
 template <ScriptContext context> int SaveFileManager::LoadFileAsync(fs::path file)
 {
 	ZoneScoped;
-	ZoneColor( tracy::Color::Red3 );
+	ZoneColor(tracy::Color::Red3);
 
 	int handle = ++m_iLastRequestHandle;
 	auto mutex = std::ref(fileMutex);
@@ -195,7 +195,7 @@ template <ScriptContext context> int SaveFileManager::LoadFileAsync(fs::path fil
 template <ScriptContext context> void SaveFileManager::DeleteFileAsync(fs::path file)
 {
 	ZoneScoped;
-	ZoneColor( tracy::Color::Red3 );
+	ZoneColor(tracy::Color::Red3);
 
 	// P.S. I don't like how we have to async delete calls but we do.
 	auto m = std::ref(fileMutex);

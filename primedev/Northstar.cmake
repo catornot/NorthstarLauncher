@@ -5,9 +5,17 @@ find_package(libcurl REQUIRED)
 find_package(minizip REQUIRED)
 find_package(silver-bun REQUIRED)
 
-option (TRACY_ENABLE " " ON)
-option (TRACY_ON_DEMAND " " ON)
-add_subdirectory (thirdparty/tracy)
+option(
+    TRACY_ENABLE
+    " "
+    ON
+    )
+option(
+    TRACY_ON_DEMAND
+    " "
+    ON
+    )
+add_subdirectory(thirdparty/tracy)
 
 add_library(
     NorthstarDLL SHARED
