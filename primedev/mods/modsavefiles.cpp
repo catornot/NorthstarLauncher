@@ -12,6 +12,7 @@
 #include "core/tier0.h"
 #include "rapidjson/error/en.h"
 #include "scripts/scriptjson.h"
+#include "tracy/Tracy.hpp"
 
 SaveFileManager* g_pSaveFileManager;
 int MAX_FOLDER_SIZE = 52428800; // 50MB (50 * 1024 * 1024)
@@ -70,6 +71,9 @@ uintmax_t GetSizeOfFolder(fs::path dir)
 // Saves a file asynchronously.
 template <ScriptContext context> void SaveFileManager::SaveFileAsync(fs::path file, std::string contents)
 {
+	ZoneScoped;
+	ZoneColor( tracy::Color::Red3 );
+
 	auto mutex = std::ref(fileMutex);
 	std::thread writeThread(
 		[mutex, file, contents]()
@@ -140,6 +144,9 @@ template <ScriptContext context> void SaveFileManager::SaveFileAsync(fs::path fi
 // Loads a file asynchronously.
 template <ScriptContext context> int SaveFileManager::LoadFileAsync(fs::path file)
 {
+	ZoneScoped;
+	ZoneColor( tracy::Color::Red3 );
+
 	int handle = ++m_iLastRequestHandle;
 	auto mutex = std::ref(fileMutex);
 	std::thread readThread(
@@ -187,6 +194,9 @@ template <ScriptContext context> int SaveFileManager::LoadFileAsync(fs::path fil
 // Deletes a file asynchronously.
 template <ScriptContext context> void SaveFileManager::DeleteFileAsync(fs::path file)
 {
+	ZoneScoped;
+	ZoneColor( tracy::Color::Red3 );
+
 	// P.S. I don't like how we have to async delete calls but we do.
 	auto m = std::ref(fileMutex);
 	std::thread deleteThread(

@@ -8,6 +8,7 @@
 #include "shared/exploit_fixes/ns_limits.h"
 #include "squirrel/squirrel.h"
 #include "plugins/pluginmanager.h"
+#include "tracy/Tracy.hpp"
 
 CHostState* g_pHostState;
 
@@ -54,6 +55,7 @@ void ServerStartingOrChangingMap()
 static void(__fastcall* o_pCHostState__State_NewGame)(CHostState* self) = nullptr;
 static void __fastcall h_CHostState__State_NewGame(CHostState* self)
 {
+	ZoneScoped;
 	spdlog::info("HostState: NewGame");
 
 	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "exec autoexec_ns_server", cmd_source_t::kCommandSrcCode);
@@ -81,6 +83,7 @@ static void __fastcall h_CHostState__State_NewGame(CHostState* self)
 static void(__fastcall* o_pCHostState__State_LoadGame)(CHostState* self) = nullptr;
 static void __fastcall h_CHostState__State_LoadGame(CHostState* self)
 {
+	ZoneScoped;
 	// singleplayer server starting
 	// useless in 99% of cases but without it things could potentially break very much
 
@@ -106,6 +109,7 @@ static void __fastcall h_CHostState__State_LoadGame(CHostState* self)
 static void(__fastcall* o_pCHostState__State_ChangeLevelMP)(CHostState* self) = nullptr;
 static void __fastcall h_CHostState__State_ChangeLevelMP(CHostState* self)
 {
+	ZoneScoped;
 	spdlog::info("HostState: ChangeLevelMP");
 
 	ServerStartingOrChangingMap();
@@ -120,6 +124,7 @@ static void __fastcall h_CHostState__State_ChangeLevelMP(CHostState* self)
 static void(__fastcall* o_pCHostState__State_GameShutdown)(CHostState* self) = nullptr;
 static void __fastcall h_CHostState__State_GameShutdown(CHostState* self)
 {
+	ZoneScoped;
 	spdlog::info("HostState: GameShutdown");
 
 	g_pServerPresence->DestroyPresence();
@@ -146,6 +151,7 @@ static void __fastcall h_CHostState__State_GameShutdown(CHostState* self)
 static void(__fastcall* o_pCHostState__FrameUpdate)(CHostState* self, double flCurrentTime, float flFrameTime) = nullptr;
 static void __fastcall h_CHostState__FrameUpdate(CHostState* self, double flCurrentTime, float flFrameTime)
 {
+	ZoneScoped;
 	o_pCHostState__FrameUpdate(self, flCurrentTime, flFrameTime);
 
 	if (*g_pServerState == server_state_t::ss_active)

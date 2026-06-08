@@ -2,6 +2,7 @@
 #include "util/version.h"
 #include "squirrel/squirrel.h"
 #include "core/tier0.h"
+#include <tracy/Tracy.hpp>
 
 HttpRequestHandler* g_httpRequestHandler;
 
@@ -234,6 +235,9 @@ template <ScriptContext context> int HttpRequestHandler::MakeHttpRequest(const H
 	std::thread requestThread(
 		[this, handle, requestParameters, bAllowLocalHttp]()
 		{
+			ZoneScoped;
+			ZoneColor( tracy::Color::Red3 );
+
 			std::string hostname, resolvedAddress, resolvedPort;
 
 			if (!bAllowLocalHttp)

@@ -5,6 +5,10 @@ find_package(libcurl REQUIRED)
 find_package(minizip REQUIRED)
 find_package(silver-bun REQUIRED)
 
+option (TRACY_ENABLE " " ON)
+option (TRACY_ON_DEMAND " " ON)
+add_subdirectory (thirdparty/tracy)
+
 add_library(
     NorthstarDLL SHARED
     "resources.rc"
@@ -121,6 +125,8 @@ add_library(
     "scripts/scriptjson.cpp"
     "scripts/scriptjson.h"
     "scripts/scriptutility.cpp"
+    "scripts/tracing.h"
+    "scripts/tracing.cpp"
     "server/auth/bansystem.cpp"
     "server/auth/bansystem.h"
     "server/auth/serverauthentication.cpp"
@@ -209,6 +215,7 @@ target_link_libraries(
             normaliz.lib
             bcrypt.lib
             version.lib
+            Tracy::TracyClient
     )
 
 target_precompile_headers(

@@ -1,5 +1,6 @@
 #include "r2server.h"
 #include "weaponx.h"
+#include "tracy/Tracy.hpp"
 
 CBaseEntity* (*Server_GetEntityByIndex)(int index);
 CBasePlayer*(__fastcall* UTIL_PlayerByIndex)(int playerIndex);
@@ -10,6 +11,7 @@ void* (*GetWeaponOwner)(CWeaponX* weapon);
 static bool(__fastcall* o_pOnWeaponAttack)(CWeaponX* a1, int a2) = nullptr;
 static bool __fastcall h_pOnWeaponAttack(CWeaponX* weapon, int a2)
 {
+	ZoneScoped;
 	auto weapon_name = GetWeaponName(weapon->m_weaponNameIndex);
 	int shotsFired = 1;
 	auto player_inst = g_pSquirrel[ScriptContext::SERVER]->__sq_createscriptinstance(GetWeaponOwner(weapon));
