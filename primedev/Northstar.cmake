@@ -139,7 +139,6 @@ add_library(
     "server/servernethooks.cpp"
     "server/serverpresence.cpp"
     "server/serverpresence.h"
-    "server/idlekick.h"
     "server/idlekick.cpp"
     "shared/exploit_fixes/exploitfixes.cpp"
     "shared/exploit_fixes/exploitfixes_lzss.cpp"
